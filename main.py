@@ -138,8 +138,31 @@ async def stream_openai_response(gemini_stream: Any, model: str):
 
     try:
         for response_chunk in gemini_stream:
-            content = getattr(response_chunk, "text", "")
-            if content:
+            content_parts = []
+            finish_reason = None
+
+            if response_chunk.candidates:
+                for candidate in response_chunk.candidates:
+                    if candidate.content and candidate.content.parts:
+                        for part in candidate.content.parts:
+                            if hasattr(part, 'text'):
+                                content_parts.append(part.text)
+                    
+                    # Check for finish_reason from Gemini's response_chunk
+                    if hasattr(candidate, 'finish_reason') and candidate.finish_reason is not None:
+                        # Map Gemini's FinishReason enum to OpenAI's string format
+                        # genai.types.protos.FinishReason.STOP (1) -> "stop"
+                        # genai.types.protos.FinishReason.MAX_TOKENS (2) -> "length"
+                        if candidate.finish_reason == 1: # STOP
+                            finish_reason = "stop"
+                        elif candidate.finish_reason == 2: # MAX_TOKENS
+                            finish_reason = "length"
+                        # Add other mappings as needed for other finish reasons
+
+            content = "".join(content_parts)
+
+            # Send a chunk if there's content or a finish reason
+            if content or finish_reason:
                 content_chunk = {
                     "id": chunk_id,
                     "object": "chat.completion.chunk",
@@ -147,16 +170,11 @@ async def stream_openai_response(gemini_stream: Any, model: str):
                     "model": model,
                     "choices": [{
                         "index": 0,
-                        "delta": {"content": content},
-                        "finish_reason": None
+                        "delta": {"content": content} if content else {},
+                        "finish_reason": finish_reason
                     }]
                 }
                 yield f"data: {json.dumps(content_chunk)}\n\n"
-            
-            # Check for finish_reason from Gemini's response_chunk (if available)
-            # The genai library handles finish reasons internally, and the stream
-            # will naturally end. We just need to send the final stop chunk.
-
 
     except Exception as e:
         logger.error("Streaming error: %s", str(e))
@@ -178,7 +196,8 @@ async def stream_openai_response(gemini_stream: Any, model: str):
             logger.warning("Client disconnected during error handling (BrokenPipeError).")
         return
 
-    # Final chunk - streaming tamamlandı sinyali (empty delta, finish_reason "stop")
+    # Ensure a final stop chunk is sent if not already handled by a finish_reason in the stream
+    # This handles cases where the stream ends without an explicit finish_reason in the last chunk.
     final_chunk = {
         "id": chunk_id,
         "object": "chat.completion.chunk",
