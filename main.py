@@ -217,6 +217,8 @@ async def make_gemini_request(api_key: str, model: str, messages: list, generati
 
 @app.post("/v1/chat/completions")
 async def chat_completions(chat_request: ChatRequest, request: Request):
+    # Unique version identifier for debugging
+    logger.info("Backend main.py version: 20250604_01")
     try:
         # Get the backend index from the custom header
         backend_index_str = request.headers.get("X-Backend-Index")
@@ -255,13 +257,12 @@ async def chat_completions(chat_request: ChatRequest, request: Request):
             stream=chat_request.stream # Pass stream parameter
         )
         
-        if request.stream:
+        if chat_request.stream:
             return StreamingResponse(
-                stream_openai_response(response, request.model),
+                stream_openai_response(response, chat_request.model),
                 media_type="text/event-stream",
                 headers={
                     "Cache-Control": "no-cache",
-                    "Content-Type": "text/event-stream",
                 }
             )
 
@@ -276,16 +277,16 @@ async def chat_completions(chat_request: ChatRequest, request: Request):
             "id": f"chatcmpl-{uuid.uuid4().hex}",
             "object": "chat.completion",
             "created": int(time.time()),
-            "model": request.model,
+            "model": chat_request.model,
             "choices": [{
                 "index": 0,
                 "message": {"role": "assistant", "content": text},
                 "finish_reason": "stop"
             }],
             "usage": {
-                "prompt_tokens": len(str(request.messages)), # This will be inaccurate for genai, but keeping for now
+                "prompt_tokens": len(str(chat_request.messages)), # This will be inaccurate for genai, but keeping for now
                 "completion_tokens": len(text),
-                "total_tokens": len(str(request.messages)) + len(text)
+                "total_tokens": len(str(chat_request.messages)) + len(text)
             }
         }
         
