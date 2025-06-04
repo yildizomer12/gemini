@@ -45,10 +45,6 @@ API_KEYS = [
     "AIzaSyAV8OU1_ANXTIvkRooikeNrI1EMR3IbTyQ"
 ]
 
-# Simple state management (in-memory)
-current_key_index = 0
-key_usage = {key: 0 for key in API_KEYS}
-
 # Pydantic Models
 class ImageUrl(BaseModel):
     url: str
@@ -68,14 +64,6 @@ class ChatRequest(BaseModel):
     temperature: float = 0.7
     max_tokens: Optional[int] = None
     stream: bool = False
-
-def get_next_key():
-    """Simple round-robin key selection"""
-    global current_key_index
-    key = API_KEYS[current_key_index]
-    current_key_index = (current_key_index + 1) % len(API_KEYS)
-    key_usage[key] = key_usage.get(key, 0) + 1
-    return key
 
 def process_content(content):
     """Convert OpenAI format to Gemini format"""
@@ -228,28 +216,43 @@ async def make_gemini_request(api_key: str, model: str, messages: list, generati
         raise
 
 @app.post("/v1/chat/completions")
-async def chat_completions(request: ChatRequest): # Keep ChatRequest for now, will refactor to use Request later if needed
+async def chat_completions(chat_request: ChatRequest, request: Request):
     try:
+        # Get the backend index from the custom header
+        backend_index_str = request.headers.get("X-Backend-Index")
+        if backend_index_str is None:
+            logger.warning("X-Backend-Index header not found. Using default key (index 0).")
+            backend_index = 0
+        else:
+            try:
+                backend_index = int(backend_index_str)
+                if not (0 <= backend_index < len(API_KEYS)):
+                    logger.warning(f"Invalid X-Backend-Index: {backend_index}. Using default key (index 0).")
+                    backend_index = 0
+            except ValueError:
+                logger.warning(f"Invalid X-Backend-Index format: {backend_index_str}. Using default key (index 0).")
+                backend_index = 0
+
+        api_key = API_KEYS[backend_index]
+        logger.info(f"Using API Key from index: {backend_index}")
+
         # Convert messages
-        gemini_messages = convert_messages(request.messages)
+        gemini_messages = convert_messages(chat_request.messages)
         generation_config = {
-            "temperature": request.temperature
+            "temperature": chat_request.temperature
         }
         
         # Only add maxOutputTokens if it's provided and not None
-        if request.max_tokens is not None:
-            generation_config["max_output_tokens"] = min(request.max_tokens, 8192)
-        
-        # API key seç
-        api_key = get_next_key()
+        if chat_request.max_tokens is not None:
+            generation_config["max_output_tokens"] = min(chat_request.max_tokens, 8192)
         
         # Gemini API çağrısı
         response = await make_gemini_request(
             api_key,
-            request.model,
+            chat_request.model,
             gemini_messages,
             generation_config,
-            stream=request.stream # Pass stream parameter
+            stream=chat_request.stream # Pass stream parameter
         )
         
         if request.stream:
@@ -304,8 +307,7 @@ async def health():
     return {
         "status": "healthy",
         "timestamp": int(time.time()),
-        "total_requests": sum(key_usage.values()),
-        "active_keys": len([k for k, v in key_usage.items() if v > 0])
+        "total_api_keys": len(API_KEYS)
     }
 
 @app.get("/")
