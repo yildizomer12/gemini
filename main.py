@@ -43,6 +43,10 @@ API_KEYS = [
     "AIzaSyAUIR9gx08SNgeHq8zKAa9wyFtFu00reTM",
     "AIzaSyAST1jah1vAcnLfmofR4DDw0rjYkJXJoWg",
     "AIzaSyAV8OU1_ANXTIvkRooikeNrI1EMR3IbTyQ"
+    "AIzaSyDjv4WUz2s6pls0LzfUdt3F_igv2ZPUKVg",
+    "AIzaSyDSiZKmUc8Etkr4pyPxXBdVHzQSxL9GNwg",
+    "AIzaSyAhOMabpXZnFuzZU1QIYA67Xgo99HYKJ_U",
+    "AIzaSyBRZhLcs6mPpkxIJhK8tRSjh1K8FBkL9Iw",
 ]
 
 # Pydantic Models
