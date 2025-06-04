@@ -25,7 +25,7 @@ app = FastAPI(title="Gemini Backend for Vercel")
 
 # API Keys - production'da environment variable kullanın
 API_KEYS = [
-    "AIzaSyCT1PXjhup0VHx3Fz4AioHbVUHED0fVBP4",
+	"AIzaSyCT1PXjhup0VHx3Fz4AioHbVUHED0fVBP4",
     "AIzaSyArNqpA1EeeXBx-S3EVnP0tzao6r4BQnO0",
     "AIzaSyCXICPfRTnNAFwNQMmtBIb3Pi0pR4SydHg",
     "AIzaSyDiLvp7CU443luErAz3Ck0B8zFdm8UvNRs",
@@ -42,12 +42,44 @@ API_KEYS = [
     "AIzaSyCIlfHXQ9vannx6G9Pae0rKwWJpdstcZIM",
     "AIzaSyAUIR9gx08SNgeHq8zKAa9wyFtFu00reTM",
     "AIzaSyAST1jah1vAcnLfmofR4DDw0rjYkJXJoWg",
-    "AIzaSyAV8OU1_ANXTIvkRooikeNrI1EMR3IbTyQ"
+    "AIzaSyAV8OU1_ANXTIvkRooikeNrI1EMR3IbTyQ",
     "AIzaSyDjv4WUz2s6pls0LzfUdt3F_igv2ZPUKVg",
     "AIzaSyDSiZKmUc8Etkr4pyPxXBdVHzQSxL9GNwg",
     "AIzaSyAhOMabpXZnFuzZU1QIYA67Xgo99HYKJ_U",
     "AIzaSyBRZhLcs6mPpkxIJhK8tRSjh1K8FBkL9Iw",
+	"AIzaSyBYE0Kkx7TZaBTAIuNbe1IifKK4M-sqy_w",
+	"AIzaSyDs6coRymAgQuDOYEymjYpZehZcPexLZMs",
+	"AIzaSyBkrBIU3rMMMvBfyrQ7COacDZPEdj94FD4",
+	"AIzaSyAYrB5t4cRfLYjH_BGAC9KmoVsBmNGZkVs",
 ]
+
+'''API KEYS GMAIL
+omer1476hotmail@gmail.com
+ebuubeydeelkassam@gmail.com
+endustriyelyildiz@gmail.com
+zixzox1481@gmail.com
+wheelweightsmachine@gmail.com
+myildiz1476@gmail.com
+zirzox1@gmail.com
+zirzox2@gmail.com
+zirzox1476@gmail.com
+zirzox4@gmail.com
+zirzox1482@gmail.com
+m08015846@gmail.com
+m46473401@gmail.com 
+dasd2323r23r3@gmail.com
+dasasdafawefa@gmail.com
+defmehme254@gmail.com
+1476ggssgg1476@gmail.com
+e00286251@gmail.com
+wqerqr6@gmail.com
+????????
+hamza
+opkdaopskdopksad@gmail.com
+dqerf3242rdfsdf@gmail.com
+fasefasdasd0@gmail.com
+dasdsads143@gmail.com
+'''
 
 # Pydantic Models
 class ImageUrl(BaseModel):
