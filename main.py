@@ -61,7 +61,7 @@ class Message(BaseModel):
 class ChatRequest(BaseModel):
     model: str
     messages: List[Message]
-    temperature: float = 0.7
+    temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     stream: bool = False
 
@@ -240,13 +240,15 @@ async def chat_completions(chat_request: ChatRequest, request: Request):
 
         # Convert messages
         gemini_messages = convert_messages(chat_request.messages)
-        generation_config = {
-            "temperature": chat_request.temperature
-        }
+        generation_config = {}
         
-        # Only add maxOutputTokens if it's provided and not None
-        if chat_request.max_tokens is not None:
-            generation_config["max_output_tokens"] = min(chat_request.max_tokens, 8192)
+        # Temperature'ı sadece istemci gönderdiyse ekle
+        if chat_request.temperature is not None:
+            generation_config["temperature"] = chat_request.temperature
+        
+        # Max Output Tokens'ı sadece pozitif bir değerse ekle
+        if chat_request.max_tokens is not None and chat_request.max_tokens != -1:
+            generation_config["max_output_tokens"] = chat_request.max_tokens
         
         # Gemini API çağrısı
         response = await make_gemini_request(
