@@ -51,6 +51,12 @@ API_KEYS = [
 	"AIzaSyDs6coRymAgQuDOYEymjYpZehZcPexLZMs",
 	"AIzaSyBkrBIU3rMMMvBfyrQ7COacDZPEdj94FD4",
 	"AIzaSyAYrB5t4cRfLYjH_BGAC9KmoVsBmNGZkVs",
+    "AIzaSyAgLy9ZXGFHZ93nzLUExFHbn7-3FNGuEXA",
+    "AIzaSyBOX_c3fOAOKudfVvoLVETV8TNGi1vp4go",
+    "AIzaSyD_DB9NYaNb4cfSXRQmC7EI0hxVLIneJ3g",
+    "AIzaSyAfnjwTDk1Md6JswVG12GRIqIa7RWi8nr4",
+    "AIzaSyDMypd1IWza4MfOfZEdaENCFddeIdBtKHQ",
+    "AIzaSyDCMpkrRw2ruX1NwJbm6zQKTzgNxAnUNhQ",
 ]
 
 '''API KEYS GMAIL
@@ -79,6 +85,12 @@ opkdaopskdopksad@gmail.com
 dqerf3242rdfsdf@gmail.com
 fasefasdasd0@gmail.com
 dasdsads143@gmail.com
+sadasf34235sdaf@gmail.com
+hafize1476@gmail.com
+adfersdaasdasd@gmail.com
+dwqqdsadasdw@gmail.com
+swaqdawdasfdsaf@gmail.com
+hafize.yildiz.448@gmail.com
 '''
 
 # Pydantic Models
