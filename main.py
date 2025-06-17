@@ -258,7 +258,20 @@ async def make_gemini_request(api_key: str, model: str, messages: list, generati
     gemini_model = genai.GenerativeModel(model)
 
     try:
-        return gemini_model.generate_content(contents=messages, generation_config=generation_config, stream=stream)
+        if stream:
+            # For streaming, generate_content returns an iterable.
+            # The library handles the streaming nature internally.
+            return gemini_model.generate_content(
+                contents=messages,
+                generation_config=generation_config,
+                stream=True
+            )
+        else:
+            # For non-streaming, use the async version
+            return await gemini_model.generate_content_async(
+                contents=messages,
+                generation_config=generation_config
+            )
     except Exception as e:
         logger.error("Error making Gemini request: %s", str(e))
         raise
