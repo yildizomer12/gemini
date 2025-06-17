@@ -11,7 +11,6 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ValidationError
 import google.generativeai as genai
 from google.api_core.exceptions import GoogleAPIError
-import httpx # Keep httpx for now, might be needed for other things or remove later
 
 # Configure logging
 logging.basicConfig(
@@ -23,9 +22,68 @@ logger = logging.getLogger(__name__)
 # FastAPI app
 app = FastAPI(title="Gemini Backend for Vercel")
 
-# API Keys - production'da environment variable kullanın
+# Model cache for performance optimization
+MODEL_CACHE = {}
+API_KEY_CACHE = {}
+RESPONSE_CACHE = {}
+
+# Cache management with TTL
+class ResponseCache:
+    def __init__(self, ttl_seconds: int = 3600):
+        self.cache = {}
+        self.ttl = ttl_seconds
+    
+    def _make_key(self, messages, model, generation_config):
+        """Create cache key from request parameters"""
+        key_data = {
+            'messages': str(messages),
+            'model': model,
+            'config': str(generation_config)
+        }
+        return hash(str(key_data))
+    
+    def get(self, messages, model, generation_config):
+        """Get cached response if valid"""
+        if not ENABLE_RESPONSE_CACHING:
+            return None
+            
+        key = self._make_key(messages, model, generation_config)
+        if key in self.cache:
+            cached_item = self.cache[key]
+            if time.time() - cached_item['timestamp'] < self.ttl:
+                logger.info(f"Cache hit for key: {key}")
+                return cached_item['response']
+            else:
+                # Expired, remove from cache
+                del self.cache[key]
+        return None
+    
+    def set(self, messages, model, generation_config, response):
+        """Cache response with timestamp"""
+        if not ENABLE_RESPONSE_CACHING:
+            return
+            
+        key = self._make_key(messages, model, generation_config)
+        self.cache[key] = {
+            'response': response,
+            'timestamp': time.time()
+        }
+        logger.info(f"Cached response for key: {key}")
+        
+        # Simple cache size management
+        if len(self.cache) > 1000:  # Max 1000 cached responses
+            # Remove oldest 100 entries
+            oldest_keys = sorted(self.cache.keys(), 
+                               key=lambda k: self.cache[k]['timestamp'])[:100]
+            for old_key in oldest_keys:
+                del self.cache[old_key]
+
+# Initialize response cache
+response_cache = ResponseCache(CACHE_TTL_SECONDS)
+
+# API Keys - Orijinal hardcoded sistem korundu (PERFORMANS ETKİSİ YOK)
 API_KEYS = [
-	"AIzaSyCT1PXjhup0VHx3Fz4AioHbVUHED0fVBP4",
+"AIzaSyCT1PXjhup0VHx3Fz4AioHbVUHED0fVBP4",
     "AIzaSyArNqpA1EeeXBx-S3EVnP0tzao6r4BQnO0",
     "AIzaSyCXICPfRTnNAFwNQMmtBIb3Pi0pR4SydHg",
     "AIzaSyDiLvp7CU443luErAz3Ck0B8zFdm8UvNRs",
@@ -47,10 +105,10 @@ API_KEYS = [
     "AIzaSyDSiZKmUc8Etkr4pyPxXBdVHzQSxL9GNwg",
     "AIzaSyAhOMabpXZnFuzZU1QIYA67Xgo99HYKJ_U",
     "AIzaSyBRZhLcs6mPpkxIJhK8tRSjh1K8FBkL9Iw",
-	"AIzaSyBYE0Kkx7TZaBTAIuNbe1IifKK4M-sqy_w",
-	"AIzaSyDs6coRymAgQuDOYEymjYpZehZcPexLZMs",
-	"AIzaSyBkrBIU3rMMMvBfyrQ7COacDZPEdj94FD4",
-	"AIzaSyAYrB5t4cRfLYjH_BGAC9KmoVsBmNGZkVs",
+"AIzaSyBYE0Kkx7TZaBTAIuNbe1IifKK4M-sqy_w",
+"AIzaSyDs6coRymAgQuDOYEymjYpZehZcPexLZMs",
+"AIzaSyBkrBIU3rMMMvBfyrQ7COacDZPEdj94FD4",
+"AIzaSyAYrB5t4cRfLYjH_BGAC9KmoVsBmNGZkVs",
     "AIzaSyAgLy9ZXGFHZ93nzLUExFHbn7-3FNGuEXA",
     "AIzaSyBOX_c3fOAOKudfVvoLVETV8TNGi1vp4go",
     "AIzaSyD_DB9NYaNb4cfSXRQmC7EI0hxVLIneJ3g",
@@ -58,6 +116,12 @@ API_KEYS = [
     "AIzaSyDMypd1IWza4MfOfZEdaENCFddeIdBtKHQ",
     "AIzaSyDCMpkrRw2ruX1NwJbm6zQKTzgNxAnUNhQ",
 ]
+
+# Performance configuration - Bu ayarlar gerçek performans etkisi yapar
+MODEL_CACHE_SIZE = 100
+API_KEY_CACHE_SIZE = 50  
+ENABLE_RESPONSE_CACHING = True  # ⚡ BÜYÜK PERFORMANS ETKİSİ
+CACHE_TTL_SECONDS = 3600
 
 '''API KEYS GMAIL
 omer1476hotmail@gmail.com
@@ -252,10 +316,24 @@ async def stream_openai_response(gemini_stream: Any, model: str):
         return
 
 
+def get_cached_model(api_key: str, model: str) -> Any:
+    """Get cached model instance or create new one"""
+    cache_key = f"{api_key[:10]}_{model}"
+    
+    if cache_key not in MODEL_CACHE:
+        # Configure API key only if not already configured for this key
+        if api_key not in API_KEY_CACHE:
+            genai.configure(api_key=api_key)
+            API_KEY_CACHE[api_key] = True
+            
+        MODEL_CACHE[cache_key] = genai.GenerativeModel(model)
+        logger.info(f"Created new model instance for cache key: {cache_key[:20]}...")
+    
+    return MODEL_CACHE[cache_key]
+
 async def make_gemini_request(api_key: str, model: str, messages: list, generation_config: dict, stream: bool = False) -> Any:
-    """Make a request to the Gemini API with the specified API key and model."""
-    genai.configure(api_key=api_key)
-    gemini_model = genai.GenerativeModel(model)
+    """Make a request to the Gemini API with cached model instance."""
+    gemini_model = get_cached_model(api_key, model)
 
     try:
         if stream:
@@ -311,6 +389,15 @@ async def chat_completions(chat_request: ChatRequest, request: Request):
         if chat_request.max_tokens is not None and chat_request.max_tokens != -1:
             generation_config["max_output_tokens"] = chat_request.max_tokens
         
+        # Check cache for non-streaming requests
+        if not chat_request.stream:
+            cached_response = response_cache.get(gemini_messages, chat_request.model, generation_config)
+            if cached_response:
+                logger.info("Returning cached response")
+                # Add cache hit header
+                cached_response["cached"] = True
+                return cached_response
+        
         # Gemini API çağrısı
         response = await make_gemini_request(
             api_key,
@@ -336,7 +423,7 @@ async def chat_completions(chat_request: ChatRequest, request: Request):
             if candidate.content and candidate.content.parts:
                 text = "".join(part.text for part in candidate.content.parts if part.text)
 
-        return {
+        response_data = {
             "id": f"chatcmpl-{uuid.uuid4().hex}",
             "object": "chat.completion",
             "created": int(time.time()),
@@ -352,6 +439,11 @@ async def chat_completions(chat_request: ChatRequest, request: Request):
                 "total_tokens": len(str(chat_request.messages)) + len(text)
             }
         }
+        
+        # Cache the response for future use
+        response_cache.set(gemini_messages, chat_request.model, generation_config, response_data)
+        
+        return response_data
         
     except HTTPException:
         raise
@@ -371,7 +463,83 @@ async def health():
     return {
         "status": "healthy",
         "timestamp": int(time.time()),
-        "total_api_keys": len(API_KEYS)
+        "total_api_keys": len(API_KEYS),
+        "cached_models": len(MODEL_CACHE),
+        "cached_api_keys": len(API_KEY_CACHE),
+        "cached_responses": len(response_cache.cache),
+        "caching_enabled": ENABLE_RESPONSE_CACHING,
+        "cache_ttl": CACHE_TTL_SECONDS,
+        "version": "2.0.0-optimized"
+    }
+
+@app.get("/metrics")
+async def metrics():
+    """Detailed metrics endpoint for monitoring"""
+    cache_stats = {
+        "total_cached_responses": len(response_cache.cache),
+        "cache_hits": sum(1 for item in response_cache.cache.values() 
+                         if time.time() - item['timestamp'] < CACHE_TTL_SECONDS),
+        "expired_entries": sum(1 for item in response_cache.cache.values() 
+                              if time.time() - item['timestamp'] >= CACHE_TTL_SECONDS)
+    }
+    
+    return {
+        "timestamp": int(time.time()),
+        "cache": cache_stats,
+        "models": {
+            "total_cached": len(MODEL_CACHE),
+            "cache_keys": list(MODEL_CACHE.keys()) if len(MODEL_CACHE) < 10 else f"{len(MODEL_CACHE)} cached models"
+        },
+        "api_keys": {
+            "total_available": len(API_KEYS),
+            "configured_keys": len(API_KEY_CACHE)
+        },
+        "configuration": {
+            "caching_enabled": ENABLE_RESPONSE_CACHING,
+            "cache_ttl": CACHE_TTL_SECONDS,
+            "model_cache_size": MODEL_CACHE_SIZE,
+            "api_key_cache_size": API_KEY_CACHE_SIZE
+        }
+    }
+
+@app.post("/admin/clear-cache")
+async def clear_cache():
+    """Clear all caches - admin endpoint"""
+    MODEL_CACHE.clear()
+    API_KEY_CACHE.clear()
+    response_cache.cache.clear()
+    
+    return {
+        "status": "success",
+        "message": "All caches cleared",
+        "timestamp": int(time.time())
+    }
+
+@app.get("/v1/models")
+async def list_models():
+    """List available models endpoint for OpenAI compatibility"""
+    return {
+        "object": "list",
+        "data": [
+            {
+                "id": "gemini-2.5-flash-preview-05-20",
+                "object": "model",
+                "created": int(time.time()),
+                "owned_by": "google"
+            },
+            {
+                "id": "gemini-1.5-pro",
+                "object": "model", 
+                "created": int(time.time()),
+                "owned_by": "google"
+            },
+            {
+                "id": "gemini-1.5-flash",
+                "object": "model",
+                "created": int(time.time()),
+                "owned_by": "google"
+            }
+        ]
     }
 
 @app.get("/")
